@@ -45,7 +45,7 @@ For example, `plugins/docs/latest.json` could contain the following package. Ent
 - Match the directory name to the plugin ID. Put changes in `latest.json`. Copaste detects new content by its catalog digest.
 - Declare `activation.mode`. Commands use the declared `command` followed by Return. Inline packages declare an `activation.example` that Copaste shows in Preferences. A command can also declare a search input `placeholder`.
 - Supply a short title and description. Titles are limited to 80 characters and descriptions to 200.
-- Choose a logo symbol (`calculator`, `plugs`, `book`, `code`, `globe`, `link` or `terminal`) and two six-digit hex colors in `logo.background.start` and `logo.background.end`. Use the same color twice for a solid background. Copaste renders the mark in both themes.
+- Browse the [Phosphor Icons gallery](https://phosphoricons.com/) to preview logo symbols. Copaste currently supports Calculator (`calculator`), Plugs (`plugs`), Book (`book`), Code (`code`), Globe (`globe`), Link (`link`) and Terminal (`terminal`). Set `logo.symbol` to the matching lowercase value. Set `logo.background.start` and `logo.background.end` to six-digit hex colors, using the same color twice for a solid background.
 - Set `defaultEnabled: false` for optional packages. Copaste builds take the data for packages marked `bundled` from the generated `bundled.json`. Bundled packages can declare an enabled default.
 - Include between one and 100 links with clear titles and HTTPS URLs. Use stable destinations without credentials, tracking or URL shorteners. A package can be at most 64 KiB.
 
