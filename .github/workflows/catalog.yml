@@ -33,3 +33,12 @@ jobs:
             printf 'Update manifest.json and plugin.js and keep the archived packages intact:\n%s\n' "$changed"
             exit 1
           fi
+
+  native-source:
+    name: Validate native source
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: xcrun swiftc -typecheck native/tcp-snapshot-v1.swift
