@@ -8,7 +8,6 @@ const maxPackageBytes = 64 * 1024;
 const maxCatalogBytes = 1024 * 1024;
 const root = resolve(import.meta.dirname, '..');
 const packages = join(root, 'plugins');
-const destination = join(root, 'catalog.json');
 const args = process.argv.slice(2);
 const check = args[0] === '--check';
 if (args.length > (check ? 1 : 0)) throw new Error('Usage: node scripts/build-catalog.mjs [--check]');
@@ -22,51 +21,68 @@ function isNewer(version, previous) {
   return false;
 }
 
-async function readVersion(directory, entry) {
-  const relativePath = `plugins/${directory}/${entry.name}`;
+async function readPackage(directory, entry) {
+  const path = `plugins/${directory}/${entry.name}`;
   try {
     if (!entry.isFile()) throw new Error('Expected a regular JSON file.');
-    const bytes = await readFile(join(root, relativePath));
+    const bytes = await readFile(join(root, path));
     if (bytes.length > maxPackageBytes) throw new Error('Plugin package exceeds 64 KiB.');
     const { command, description, id, kind, logo, title, version } = parsePluginPackage(
       JSON.parse(bytes.toString('utf8'))
     );
-    if (id !== directory || entry.name !== `${version}.json`) {
-      throw new Error('Plugin ID and version must match the path.');
-    }
+    const expected = version === undefined ? 'latest.json' : `${version}.json`;
+    if (id !== directory || entry.name !== expected) throw new Error('Plugin metadata does not match its path.');
     const sha256 = createHash('sha256').update(bytes).digest('hex');
-    return { apiVersion: 1, command, description, id, kind, ...(logo ? { logo } : {}), sha256, title, version };
+    return {
+      apiVersion: 1,
+      command,
+      description,
+      id,
+      kind,
+      ...(logo ? { logo } : {}),
+      sha256,
+      title,
+      ...(version === undefined ? {} : { version }),
+    };
   } catch (error) {
-    throw new Error(`${relativePath}: ${error.message}`, { cause: error });
+    throw new Error(`${path}: ${error.message}`, { cause: error });
   }
 }
 
-const plugins = [];
+async function writeCatalog(file, plugins) {
+  const catalog = { apiVersion: 1, plugins };
+  parseCatalog(catalog);
+  const output = `${JSON.stringify(catalog, null, 2)}\n`;
+  if (Buffer.byteLength(output) > maxCatalogBytes) throw new Error('Plugin catalog exceeds 1 MiB.');
+  const destination = join(root, file);
+  if (check) {
+    if ((await readFile(destination, 'utf8')) !== output) {
+      throw new Error(`Regenerate ${file} with node scripts/build-catalog.mjs and commit it.`);
+    }
+  } else {
+    await writeFile(destination, output);
+  }
+}
+
+const latest = [];
+const legacy = [];
 const directories = (await readdir(packages, { withFileTypes: true })).sort((a, b) =>
   a.name.localeCompare(b.name, 'en')
 );
 for (const directory of directories) {
   const { name } = directory;
   if (!directory.isDirectory() || !pluginIdPattern.test(name)) throw new Error(`Invalid plugin folder: ${name}`);
-  let latest;
-  for (const version of await readdir(join(packages, name), { withFileTypes: true })) {
-    const entry = await readVersion(name, version);
-    if (!latest || isNewer(entry.version, latest.version)) latest = entry;
+  let archived;
+  let live;
+  for (const entry of await readdir(join(packages, name), { withFileTypes: true })) {
+    const plugin = await readPackage(name, entry);
+    if (entry.name === 'latest.json') live = plugin;
+    else if (!archived || isNewer(plugin.version, archived.version)) archived = plugin;
   }
-  if (!latest) throw new Error(`Plugin folder ${name} is empty.`);
-  plugins.push(latest);
+  if (!live && !archived) throw new Error(`Plugin folder ${name} is empty.`);
+  if (live) latest.push(live);
+  if (archived) legacy.push(archived);
 }
-
-const catalog = { apiVersion: 1, plugins };
-parseCatalog(catalog);
-const output = `${JSON.stringify(catalog, null, 2)}\n`;
-if (Buffer.byteLength(output) > maxCatalogBytes) throw new Error('Plugin catalog exceeds 1 MiB.');
-
-if (check) {
-  if ((await readFile(destination, 'utf8')) !== output) {
-    throw new Error('Run node scripts/build-catalog.mjs and commit the updated catalog.json.');
-  }
-} else {
-  await writeFile(destination, output);
-}
-console.log(`Validated ${plugins.length} plugin catalog entries.`);
+await writeCatalog('catalog-latest.json', latest);
+await writeCatalog('catalog.json', legacy);
+console.log(`Validated ${latest.length} latest and ${legacy.length} archived plugin entries.`);

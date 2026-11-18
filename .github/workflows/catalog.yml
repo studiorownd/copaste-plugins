@@ -23,13 +23,13 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - run: node scripts/build-catalog.mjs --check
-      - name: Preserve published versions
+      - name: Preserve archived packages
         if: github.event_name == 'pull_request'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          changed=$(git diff --name-only --no-renames --diff-filter=DMRT "$BASE_SHA" HEAD -- plugins/)
+          changed=$(git diff --name-only --no-renames --diff-filter=ADMRT "$BASE_SHA" HEAD -- plugins/ ':(glob,exclude)plugins/*/latest.json')
           if [ -n "$changed" ]; then
-            printf 'Publish a new version instead of editing or deleting these packages:\n%s\n' "$changed"
+            printf 'Update latest.json and keep the archived packages intact:\n%s\n' "$changed"
             exit 1
           fi

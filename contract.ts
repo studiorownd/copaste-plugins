@@ -11,7 +11,7 @@ export type PluginMetadata = {
   kind: PluginKind;
   logo?: PluginLogo;
   title: string;
-  version: string;
+  version?: string;
 };
 
 export type PluginLink = { title: string; url: string };
@@ -51,12 +51,12 @@ export function pluginMetadata(value: unknown): PluginMetadata {
   const { apiVersion, kind } = object;
   const command = text(object.command, 40);
   const id = text(object.id, 40);
-  const version = text(object.version, 20);
+  const version = Object.hasOwn(object, 'version') ? text(object.version, 20) : undefined;
   if (
     apiVersion !== 1 ||
     !pluginIdPattern.test(id) ||
     !pluginIdPattern.test(command) ||
-    !versionPattern.test(version) ||
+    (version !== undefined && !versionPattern.test(version)) ||
     (kind !== 'calculator' && kind !== 'tcp-listeners' && kind !== 'links') ||
     (kind === 'calculator' && (id !== 'calculator' || command !== 'calculate')) ||
     (kind !== 'calculator' && (id === 'calculator' || command === 'calculate')) ||
@@ -72,7 +72,7 @@ export function pluginMetadata(value: unknown): PluginMetadata {
     kind,
     ...(Object.hasOwn(object, 'logo') ? { logo: parseLogo(object.logo) } : {}),
     title: text(object.title, 80),
-    version,
+    ...(version === undefined ? {} : { version }),
   };
 }
 
