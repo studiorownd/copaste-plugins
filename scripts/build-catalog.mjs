@@ -28,12 +28,14 @@ async function readVersion(directory, entry) {
     if (!entry.isFile()) throw new Error('Expected a regular JSON file.');
     const bytes = await readFile(join(root, relativePath));
     if (bytes.length > maxPackageBytes) throw new Error('Plugin package exceeds 64 KiB.');
-    const { command, description, id, kind, title, version } = parsePluginPackage(JSON.parse(bytes.toString('utf8')));
+    const { command, description, id, kind, logo, title, version } = parsePluginPackage(
+      JSON.parse(bytes.toString('utf8'))
+    );
     if (id !== directory || entry.name !== `${version}.json`) {
       throw new Error('Plugin ID and version must match the path.');
     }
     const sha256 = createHash('sha256').update(bytes).digest('hex');
-    return { apiVersion: 1, command, description, id, kind, sha256, title, version };
+    return { apiVersion: 1, command, description, id, kind, ...(logo ? { logo } : {}), sha256, title, version };
   } catch (error) {
     throw new Error(`${relativePath}: ${error.message}`, { cause: error });
   }

@@ -1,20 +1,27 @@
-export type PluginKind = 'calculator' | 'tcp-listeners' | 'links';
+export type PluginKind = 'calculator' | 'links' | 'tcp-listeners';
+
+const logoColors = ['violet', 'teal', 'blue', 'orange', 'pink', 'slate'] as const;
+const logoSymbols = ['calculator', 'plugs', 'book', 'code', 'globe', 'link', 'terminal'] as const;
+export type PluginLogo = { color: (typeof logoColors)[number]; symbol: (typeof logoSymbols)[number] };
 
 export type PluginMetadata = {
   command: string;
   description: string;
   id: string;
   kind: PluginKind;
+  logo?: PluginLogo;
   title: string;
   version: string;
 };
 
 export type PluginLink = { title: string; url: string };
 
-export type PluginPackage = PluginMetadata &
-  ({ kind: 'calculator' } | { kind: 'tcp-listeners' } | { kind: 'links'; links: PluginLink[] });
+export type PluginPackage = (
+  { kind: 'calculator' } | { kind: 'links'; links: PluginLink[] } | { kind: 'tcp-listeners' }
+) &
+  PluginMetadata;
 
-export type CatalogEntry = PluginMetadata & { sha256: string };
+export type CatalogEntry = { sha256: string } & PluginMetadata;
 
 export const pluginIdPattern = /^[a-z][a-z0-9-]{0,39}$/;
 const versionPattern = /^(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})$/;
@@ -29,6 +36,14 @@ function text(value: unknown, max: number): string {
     throw new Error('Invalid plugin text.');
   }
   return value;
+}
+
+function parseLogo(value: unknown): PluginLogo {
+  const logo = record(value);
+  const color = logoColors.find(color => color === logo.color);
+  const symbol = logoSymbols.find(symbol => symbol === logo.symbol);
+  if (Object.keys(logo).length !== 2 || !color || !symbol) throw new Error('Unsupported plugin logo.');
+  return { color, symbol };
 }
 
 export function pluginMetadata(value: unknown): PluginMetadata {
@@ -50,7 +65,15 @@ export function pluginMetadata(value: unknown): PluginMetadata {
   ) {
     throw new Error('Unsupported plugin metadata.');
   }
-  return { command, description: text(object.description, 200), id, kind, title: text(object.title, 80), version };
+  return {
+    command,
+    description: text(object.description, 200),
+    id,
+    kind,
+    ...(Object.hasOwn(object, 'logo') ? { logo: parseLogo(object.logo) } : {}),
+    title: text(object.title, 80),
+    version,
+  };
 }
 
 export function parsePluginPackage(value: unknown): PluginPackage {
@@ -59,7 +82,9 @@ export function parsePluginPackage(value: unknown): PluginPackage {
   const fields = ['apiVersion', ...Object.keys(metadata)];
   if (metadata.kind !== 'links') {
     if (Object.keys(object).some(key => !fields.includes(key))) throw new Error('Unknown plugin field.');
-    return metadata.kind === 'calculator' ? { ...metadata, kind: 'calculator' } : { ...metadata, kind: 'tcp-listeners' };
+    return metadata.kind === 'calculator'
+      ? { ...metadata, kind: 'calculator' }
+      : { ...metadata, kind: 'tcp-listeners' };
   }
   if (
     Object.keys(object).some(key => key !== 'links' && !fields.includes(key)) ||

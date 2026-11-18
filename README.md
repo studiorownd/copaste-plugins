@@ -1,6 +1,6 @@
 # Copaste Plugins
 
-This is the official Copaste plugin catalog maintained by Studio Rownd. Browse and enable plugins in **Preferences → Plugins**. Calculator ships with Copaste and is enabled by default. Optional plugins such as Port Manager download when you enable them.
+This is the official Copaste plugin catalog maintained by Studio Rownd. Open **Plugins** in the Preferences sidebar to browse and enable plugins. Calculator ships with Copaste and is enabled by default. Optional plugins such as Port Manager download when you enable them.
 
 Plugin packages stay on the current Mac. If you use iCloud backup, your enabled choices are saved with your Copaste configuration. Copaste downloads the selected packages again as needed when you restore that configuration on another Mac.
 
@@ -32,6 +32,7 @@ For example, `plugins/docs/1.0.0.json` could contain the following package. Ente
   "command": "docs",
   "title": "Developer Docs",
   "description": "Open browser and Apple developer documentation",
+  "logo": { "color": "blue", "symbol": "book" },
   "links": [
     { "title": "MDN Web Docs", "url": "https://developer.mozilla.org/en-US/docs/Web" },
     { "title": "Apple Developer Documentation", "url": "https://developer.apple.com/documentation/" }
@@ -42,6 +43,7 @@ For example, `plugins/docs/1.0.0.json` could contain the following package. Ente
 - Start the ID and command with a lowercase letter. Use up to 40 characters drawn from `a–z`, `0–9` and `-`.
 - Use a numeric `major.minor.patch` version. Match both the directory ID and the filename version to the JSON fields. To update a plugin, add a file with a higher version so the original remains reproducible.
 - Supply a short title and description. Titles are limited to 80 characters and descriptions to 200.
+- Choose a logo color (`violet`, `teal`, `blue`, `orange`, `pink` or `slate`) and symbol (`calculator`, `plugs`, `book`, `code`, `globe`, `link` or `terminal`). Copaste renders the mark in both themes.
 - Include between one and 100 links with clear titles and HTTPS URLs. Use stable destinations without credentials, tracking or URL shorteners. A package can be at most 64 KiB.
 
 Packages contain data that Copaste interprets. A `links` package lists destinations and lets users choose which URL to open. Calculator and Port Manager use the same API version and metadata fields with host-provided `calculator` and `tcp-listeners` capabilities. Propose new host capabilities separately so Studio Rownd can review the platform access they require. See the [Calculator package](plugins/calculator/1.0.0.json) and [Port Manager package](plugins/ports/1.0.0.json).
