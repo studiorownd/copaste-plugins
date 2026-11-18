@@ -1,15 +1,19 @@
 export type PluginKind = 'calculator' | 'links' | 'tcp-listeners';
 
-const logoColors = ['violet', 'teal', 'blue', 'orange', 'pink', 'slate'] as const;
 const logoSymbols = ['calculator', 'plugs', 'book', 'code', 'globe', 'link', 'terminal'] as const;
-export type PluginLogo = { color: (typeof logoColors)[number]; symbol: (typeof logoSymbols)[number] };
+export type PluginLogo = { background: { end: string; start: string }; symbol: (typeof logoSymbols)[number] };
+export type PluginActivation = { example: string; mode: 'inline' } | { mode: 'command' };
 
 export type PluginMetadata = {
+  activation?: PluginActivation;
+  bundled?: boolean;
   command: string;
+  defaultEnabled?: boolean;
   description: string;
   id: string;
   kind: PluginKind;
   logo?: PluginLogo;
+  placeholder?: string;
   title: string;
   version?: string;
 };
@@ -40,15 +44,37 @@ function text(value: unknown, max: number): string {
 
 function parseLogo(value: unknown): PluginLogo {
   const logo = record(value);
-  const color = logoColors.find(color => color === logo.color);
   const symbol = logoSymbols.find(symbol => symbol === logo.symbol);
-  if (Object.keys(logo).length !== 2 || !color || !symbol) throw new Error('Unsupported plugin logo.');
-  return { color, symbol };
+  const background = record(logo.background);
+  const end = text(background.end, 7);
+  const start = text(background.start, 7);
+  const hex = /^#[0-9a-f]{6}$/i;
+  if (
+    Object.keys(logo).length !== 2 ||
+    Object.keys(background).length !== 2 ||
+    !symbol ||
+    !hex.test(start) ||
+    !hex.test(end)
+  ) {
+    throw new Error('Unsupported plugin logo.');
+  }
+  return { background: { end, start }, symbol };
+}
+
+function parseActivation(value: unknown, kind: PluginKind): PluginActivation {
+  const activation = record(value);
+  if (kind === 'calculator' && activation.mode === 'inline' && Object.keys(activation).length === 2) {
+    return { example: text(activation.example, 128), mode: 'inline' };
+  }
+  if (kind !== 'calculator' && activation.mode === 'command' && Object.keys(activation).length === 1) {
+    return { mode: 'command' };
+  }
+  throw new Error('Invalid plugin activation.');
 }
 
 export function pluginMetadata(value: unknown): PluginMetadata {
   const object = record(value);
-  const { apiVersion, kind } = object;
+  const { apiVersion, bundled, defaultEnabled, kind } = object;
   const command = text(object.command, 40);
   const id = text(object.id, 40);
   const version = Object.hasOwn(object, 'version') ? text(object.version, 20) : undefined;
@@ -58,19 +84,22 @@ export function pluginMetadata(value: unknown): PluginMetadata {
     !pluginIdPattern.test(command) ||
     (version !== undefined && !versionPattern.test(version)) ||
     (kind !== 'calculator' && kind !== 'tcp-listeners' && kind !== 'links') ||
-    (kind === 'calculator' && (id !== 'calculator' || command !== 'calculate')) ||
-    (kind !== 'calculator' && (id === 'calculator' || command === 'calculate')) ||
-    (kind === 'tcp-listeners' && (id !== 'ports' || command !== 'ports')) ||
-    (kind !== 'tcp-listeners' && (id === 'ports' || command === 'ports'))
+    (Object.hasOwn(object, 'bundled') && typeof bundled !== 'boolean') ||
+    (Object.hasOwn(object, 'defaultEnabled') && typeof defaultEnabled !== 'boolean') ||
+    (defaultEnabled === true && bundled !== true)
   ) {
     throw new Error('Unsupported plugin metadata.');
   }
   return {
+    ...(Object.hasOwn(object, 'activation') ? { activation: parseActivation(object.activation, kind) } : {}),
+    ...(typeof bundled === 'boolean' ? { bundled } : {}),
     command,
+    ...(typeof defaultEnabled === 'boolean' ? { defaultEnabled } : {}),
     description: text(object.description, 200),
     id,
     kind,
     ...(Object.hasOwn(object, 'logo') ? { logo: parseLogo(object.logo) } : {}),
+    ...(Object.hasOwn(object, 'placeholder') ? { placeholder: text(object.placeholder, 100) } : {}),
     title: text(object.title, 80),
     ...(version === undefined ? {} : { version }),
   };

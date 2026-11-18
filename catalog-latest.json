@@ -3,20 +3,45 @@
   "plugins": [
     {
       "apiVersion": 1,
+      "activation": {
+        "example": "2+2",
+        "mode": "inline"
+      },
+      "bundled": true,
       "command": "calculate",
+      "defaultEnabled": true,
       "description": "Calculate expressions directly in application search",
       "id": "calculator",
       "kind": "calculator",
-      "sha256": "133e59ddb889b5a3754a0e1e2f6bec84890d4b8c2bea2439b262ef5d31accad6",
+      "logo": {
+        "background": {
+          "end": "#5e31cc",
+          "start": "#ab73fd"
+        },
+        "symbol": "calculator"
+      },
+      "sha256": "0d9f52b99a1c2181279a3c3b4d31bd8564c390cd6969b81804ccf80543f54127",
       "title": "Calculator"
     },
     {
       "apiVersion": 1,
+      "activation": {
+        "mode": "command"
+      },
       "command": "ports",
+      "defaultEnabled": false,
       "description": "Inspect TCP listeners and terminate your development processes",
       "id": "ports",
       "kind": "tcp-listeners",
-      "sha256": "cae3c93ed7eaa0e70a80be5fcc70574e6806c4871a1497c18869e15db77f297a",
+      "logo": {
+        "background": {
+          "end": "#006d79",
+          "start": "#29c9b1"
+        },
+        "symbol": "plugs"
+      },
+      "placeholder": "Filter by port or process",
+      "sha256": "c320abb28a322ab54056e0ed90d4b41eb0203f8a58d8eb6f14f01296f45821df",
       "title": "Port Manager"
     }
   ]

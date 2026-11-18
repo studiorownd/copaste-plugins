@@ -4,5 +4,17 @@
   "kind": "tcp-listeners",
   "command": "ports",
   "title": "Port Manager",
-  "description": "Inspect TCP listeners and terminate your development processes"
+  "description": "Inspect TCP listeners and terminate your development processes",
+  "activation": {
+    "mode": "command"
+  },
+  "logo": {
+    "background": {
+      "start": "#29c9b1",
+      "end": "#006d79"
+    },
+    "symbol": "plugs"
+  },
+  "placeholder": "Filter by port or process",
+  "defaultEnabled": false
 }

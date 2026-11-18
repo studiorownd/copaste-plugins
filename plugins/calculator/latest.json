@@ -4,5 +4,18 @@
   "kind": "calculator",
   "command": "calculate",
   "title": "Calculator",
-  "description": "Calculate expressions directly in application search"
+  "description": "Calculate expressions directly in application search",
+  "activation": {
+    "mode": "inline",
+    "example": "2+2"
+  },
+  "logo": {
+    "background": {
+      "start": "#ab73fd",
+      "end": "#5e31cc"
+    },
+    "symbol": "calculator"
+  },
+  "bundled": true,
+  "defaultEnabled": true
 }

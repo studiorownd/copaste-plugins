@@ -27,32 +27,38 @@ async function readPackage(directory, entry) {
     if (!entry.isFile()) throw new Error('Expected a regular JSON file.');
     const bytes = await readFile(join(root, path));
     if (bytes.length > maxPackageBytes) throw new Error('Plugin package exceeds 64 KiB.');
-    const { command, description, id, kind, logo, title, version } = parsePluginPackage(
-      JSON.parse(bytes.toString('utf8'))
-    );
+    const source = JSON.parse(bytes.toString('utf8'));
+    const { activation, bundled, command, defaultEnabled, description, id, kind, logo, placeholder, title, version } =
+      parsePluginPackage(source);
     const expected = version === undefined ? 'latest.json' : `${version}.json`;
     if (id !== directory || entry.name !== expected) throw new Error('Plugin metadata does not match its path.');
+    if (version === undefined && (!activation || !logo || typeof defaultEnabled !== 'boolean')) {
+      throw new Error('Latest packages must declare activation, a logo and their default enabled state.');
+    }
     const sha256 = createHash('sha256').update(bytes).digest('hex');
-    return {
+    const metadata = {
       apiVersion: 1,
+      ...(activation ? { activation } : {}),
+      ...(bundled === undefined ? {} : { bundled }),
       command,
+      ...(defaultEnabled === undefined ? {} : { defaultEnabled }),
       description,
       id,
       kind,
       ...(logo ? { logo } : {}),
+      ...(placeholder ? { placeholder } : {}),
       sha256,
       title,
       ...(version === undefined ? {} : { version }),
     };
+    return { metadata, source };
   } catch (error) {
     throw new Error(`${path}: ${error.message}`, { cause: error });
   }
 }
 
-async function writeCatalog(file, plugins) {
-  const catalog = { apiVersion: 1, plugins };
-  parseCatalog(catalog);
-  const output = `${JSON.stringify(catalog, null, 2)}\n`;
+async function writeCatalogFile(file, value) {
+  const output = `${JSON.stringify(value, null, 2)}\n`;
   if (Buffer.byteLength(output) > maxCatalogBytes) throw new Error('Plugin catalog exceeds 1 MiB.');
   const destination = join(root, file);
   if (check) {
@@ -66,6 +72,7 @@ async function writeCatalog(file, plugins) {
 
 const latest = [];
 const legacy = [];
+const bundled = [];
 const directories = (await readdir(packages, { withFileTypes: true })).sort((a, b) =>
   a.name.localeCompare(b.name, 'en')
 );
@@ -75,14 +82,23 @@ for (const directory of directories) {
   let archived;
   let live;
   for (const entry of await readdir(join(packages, name), { withFileTypes: true })) {
-    const plugin = await readPackage(name, entry);
-    if (entry.name === 'latest.json') live = plugin;
-    else if (!archived || isNewer(plugin.version, archived.version)) archived = plugin;
+    const { metadata, source } = await readPackage(name, entry);
+    if (entry.name === 'latest.json') {
+      live = metadata;
+      if (metadata.bundled) bundled.push(source);
+    } else if (!archived || isNewer(metadata.version, archived.version)) archived = metadata;
   }
   if (!live && !archived) throw new Error(`Plugin folder ${name} is empty.`);
   if (live) latest.push(live);
   if (archived) legacy.push(archived);
 }
-await writeCatalog('catalog-latest.json', latest);
-await writeCatalog('catalog.json', legacy);
+for (const [file, plugins] of [
+  ['catalog-latest.json', latest],
+  ['catalog.json', legacy],
+]) {
+  const catalog = { apiVersion: 1, plugins };
+  parseCatalog(catalog);
+  await writeCatalogFile(file, catalog);
+}
+await writeCatalogFile('bundled.json', bundled);
 console.log(`Validated ${latest.length} latest and ${legacy.length} archived plugin entries.`);
