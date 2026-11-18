@@ -1,4 +1,6 @@
 export type PluginKind = 'calculator' | 'links' | 'tcp-listeners';
+export type PluginApiVersion = 1 | 2;
+export type NativePluginComponent = { capability: 'tcp-snapshot-v1'; sha256: string };
 
 const logoSymbols = ['calculator', 'plugs', 'book', 'code', 'globe', 'link', 'terminal'] as const;
 export type PluginLogo = { background: { end: string; start: string }; symbol: (typeof logoSymbols)[number] };
@@ -6,6 +8,7 @@ export type PluginActivation = { example: string; mode: 'inline' } | { mode: 'co
 
 export type PluginMetadata = {
   activation?: PluginActivation;
+  apiVersion: PluginApiVersion;
   bundled?: boolean;
   command: string;
   defaultEnabled?: boolean;
@@ -13,6 +16,7 @@ export type PluginMetadata = {
   id: string;
   kind: PluginKind;
   logo?: PluginLogo;
+  native?: NativePluginComponent;
   placeholder?: string;
   title: string;
   version?: string;
@@ -24,9 +28,13 @@ export type PluginPackage = (
   { kind: 'calculator' } | { kind: 'links'; links: PluginLink[] } | { kind: 'tcp-listeners' }
 ) & { script?: string } & PluginMetadata;
 
-export type CatalogEntry = { sha256: string } & PluginMetadata;
+export type CatalogEntry = { assetRelease?: string; sha256: string } & PluginMetadata;
 
+export const maxNativePluginArtifactBytes = 1024 * 1024;
+export const pluginAssetReleaseTagPattern = /^plugins-[a-f0-9]{40}(?:-part-[1-9][0-9]?)?$/;
 export const pluginIdPattern = /^[a-z][a-z0-9-]{0,39}$/;
+export const pluginReleaseTagPattern = /^plugins-[a-f0-9]{40}$/;
+const sha256Pattern = /^[a-f0-9]{64}$/;
 const versionPattern = /^(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})$/;
 
 function record(value: unknown): Record<string, unknown> {
@@ -71,14 +79,30 @@ function parseActivation(value: unknown, kind: PluginKind): PluginActivation {
   throw new Error('Invalid plugin activation.');
 }
 
+function parseNativeComponent(value: unknown): NativePluginComponent {
+  const component = record(value);
+  const sha256 = text(component.sha256, 64);
+  if (
+    Object.keys(component).length !== 2 ||
+    component.capability !== 'tcp-snapshot-v1' ||
+    !sha256Pattern.test(sha256)
+  ) {
+    throw new Error('Unsupported native plugin component.');
+  }
+  return { capability: component.capability, sha256 };
+}
+
 export function pluginMetadata(value: unknown): PluginMetadata {
   const object = record(value);
   const { apiVersion, bundled, defaultEnabled, kind } = object;
   const command = text(object.command, 40);
   const id = text(object.id, 40);
   const version = Object.hasOwn(object, 'version') ? text(object.version, 20) : undefined;
+  const native = Object.hasOwn(object, 'native') ? parseNativeComponent(object.native) : undefined;
   if (
-    apiVersion !== 1 ||
+    (apiVersion !== 1 && apiVersion !== 2) ||
+    (apiVersion === 1 && native !== undefined) ||
+    (apiVersion === 2 && (!native || kind !== 'tcp-listeners' || version !== undefined || bundled !== undefined)) ||
     !pluginIdPattern.test(id) ||
     !pluginIdPattern.test(command) ||
     (version !== undefined && !versionPattern.test(version)) ||
@@ -90,6 +114,7 @@ export function pluginMetadata(value: unknown): PluginMetadata {
   }
   return {
     ...(Object.hasOwn(object, 'activation') ? { activation: parseActivation(object.activation, kind) } : {}),
+    apiVersion,
     ...(typeof bundled === 'boolean' ? { bundled } : {}),
     command,
     ...(typeof defaultEnabled === 'boolean' ? { defaultEnabled } : {}),
@@ -97,6 +122,7 @@ export function pluginMetadata(value: unknown): PluginMetadata {
     id,
     kind,
     ...(Object.hasOwn(object, 'logo') ? { logo: parseLogo(object.logo) } : {}),
+    ...(native ? { native } : {}),
     ...(Object.hasOwn(object, 'placeholder') ? { placeholder: text(object.placeholder, 100) } : {}),
     title: text(object.title, 80),
     ...(version === undefined ? {} : { version }),
@@ -106,8 +132,9 @@ export function pluginMetadata(value: unknown): PluginMetadata {
 export function parsePluginPackage(value: unknown): PluginPackage {
   const object = record(value);
   const metadata = pluginMetadata(object);
-  const fields = ['apiVersion', ...Object.keys(metadata)];
+  const fields = Object.keys(metadata);
   const program = Object.hasOwn(object, 'script') ? { script: text(object.script, 64 * 1024) } : {};
+  if (metadata.apiVersion === 2 && !program.script) throw new Error('Missing plugin script.');
   if (program.script) fields.push('script');
   if (metadata.kind !== 'links') {
     if (Object.keys(object).some(key => !fields.includes(key))) throw new Error('Unknown plugin field.');
@@ -134,22 +161,48 @@ export function parsePluginPackage(value: unknown): PluginPackage {
   return { ...metadata, ...program, kind: 'links', links };
 }
 
-export function parseCatalog(value: unknown): CatalogEntry[] {
-  const object = record(value);
-  if (object.apiVersion !== 1 || !Array.isArray(object.plugins) || object.plugins.length > 2000) {
+function parseCatalogEntries(object: Record<string, unknown>, apiVersion: PluginApiVersion, release?: string) {
+  if (object.apiVersion !== apiVersion || !Array.isArray(object.plugins) || object.plugins.length > 2000) {
     throw new Error('Unsupported plugin catalog.');
   }
   const ids = new Set<string>();
   const commands = new Set<string>();
-  return object.plugins.map(value => {
+  const plugins: CatalogEntry[] = [];
+  for (const value of object.plugins) {
     const entry = record(value);
+    if (typeof entry.apiVersion === 'number' && Number.isSafeInteger(entry.apiVersion) && entry.apiVersion > apiVersion)
+      continue;
     const metadata = pluginMetadata(entry);
+    // API 2 hosts use the downloaded process helper and cannot load the legacy TCP package.
+    if (apiVersion === 2 && metadata.kind === 'tcp-listeners' && metadata.apiVersion === 1) continue;
+    const assetRelease = Object.hasOwn(entry, 'assetRelease') ? text(entry.assetRelease, 56) : undefined;
+    if (
+      assetRelease &&
+      (!release || !assetRelease.startsWith(`${release}-part-`) || !pluginAssetReleaseTagPattern.test(assetRelease))
+    ) {
+      throw new Error('Invalid plugin asset release.');
+    }
     const sha256 = text(entry.sha256, 64);
-    if (!/^[a-f0-9]{64}$/.test(sha256) || ids.has(metadata.id) || commands.has(metadata.command)) {
+    if (!sha256Pattern.test(sha256) || ids.has(metadata.id) || commands.has(metadata.command)) {
       throw new Error('Invalid plugin catalog entry.');
     }
     ids.add(metadata.id);
     commands.add(metadata.command);
-    return { ...metadata, sha256 };
-  });
+    plugins.push({ ...metadata, ...(assetRelease ? { assetRelease } : {}), sha256 });
+  }
+  return plugins;
+}
+
+export function parseCatalog(value: unknown, apiVersion: PluginApiVersion = 1): CatalogEntry[] {
+  return parseCatalogEntries(record(value), apiVersion);
+}
+
+export function parseReleaseCatalog(value: unknown): { entries: CatalogEntry[]; release: string } {
+  const catalog = record(value);
+  const release = text(catalog.release, 48);
+  if (!pluginReleaseTagPattern.test(release)) throw new Error('Invalid plugin catalog release.');
+  const entries = parseCatalogEntries(catalog, 2, release);
+  if ((catalog.plugins as unknown[]).length !== entries.length)
+    throw new Error('Incompatible entry in plugin release.');
+  return { entries, release };
 }

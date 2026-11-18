@@ -2,7 +2,7 @@
 
 This is the official Copaste plugin catalog maintained by Studio Rownd. Open **Plugins** in the Preferences sidebar. Copaste downloads Calculator automatically on the first online launch. Other plugins download when you enable them. Copaste keeps enabled packages up to date automatically.
 
-Plugin packages stay on the current Mac. If you use iCloud backup, your enabled choices are saved with your Copaste configuration. Copaste downloads the selected packages again as needed when you restore that configuration on another Mac.
+Copaste downloads installable packages from [GitHub Releases](https://github.com/studiorownd/copaste-plugins/releases). Packages and native helpers stay on the current Mac and are removed when their plugin is disabled. If you use iCloud backup, your enabled choices are saved with your Copaste configuration. Copaste downloads the selected packages again as needed after a restore.
 
 ## Submit a plugin
 
@@ -17,7 +17,7 @@ Plugin packages stay on the current Mac. If you use iCloud backup, your enabled 
 
 4. Commit both source files, the generated `latest.json` package and the regenerated catalog. Push your branch to your fork and open a pull request against `studiorownd/copaste-plugins:main`. Include what the plugin does, its command, the destinations it opens and how you checked it.
 
-Studio Rownd reviews the package and the destinations it links to before merging. GitHub Actions checks the package shape, generated catalog and archived files. After the PR merges to `main`, Copaste picks up the change on its next plugin update check.
+Studio Rownd reviews the package and the destinations it links to before merging. GitHub Actions checks the source, legacy catalog and archived files. Copaste picks up approved changes after the next plugin release is published.
 
 ## Package format
 
@@ -70,4 +70,20 @@ globalThis.copastePlugin = {
 - [Port Manager](plugins/ports/plugin.js) uses `kind: "tcp-listeners"` and implements `query(query, listeners)`. The host supplies a bounded local snapshot with `id`, `pid`, `name` and `endpoints`. Return up to 100 rows using `{ id, title, description }`. Copaste verifies row IDs, owns the confirmation dialog and rechecks the process before termination.
 - Propose a new host capability separately so Studio Rownd can review the platform access it needs.
 
-The generator checks the manifest and JavaScript syntax, builds `latest.json`, and records the SHA-256 of the package's exact bytes in `catalog-latest.json`. Copaste verifies the downloaded package against that digest before replacing the installed copy. The original `catalog.json` and numbered package files serve older builds.
+## Native source contributions
+
+Plugins reuse the host capabilities declared in their manifest. For example, any `tcp-listeners` plugin can consume the TCP snapshot provided by the shared [native helper](native/tcp-snapshot-v1.swift). Copaste runs it as a separate process with the `list` and `inspect` protocol. Copaste handles process termination itself after checking the target and obtaining user confirmation.
+
+Propose native additions as source in a PR. Include the protocol, the system information it needs and how to test it. Studio Rownd reviews new native capabilities and their access before adding them to the host and release build. The release team compiles the reviewed source, signs it and sends it to Apple's notary service. PR jobs run source checks with read access. Signing credentials stay with the maintainer release step.
+
+## Publish a release
+
+From a clean checkout of the approved public `main` commit on a macOS signing machine, run the release script with Node.js 24. Keep the Developer ID certificate and Apple notary credentials on that machine. Use a private environment file outside the public repository with `APPLE_API_ISSUER`, `APPLE_API_KEY_ID` and the `APPLE_API_KEY` file path.
+
+```sh
+node --env-file=/path/to/private/notary.env scripts/release-plugins.mjs
+```
+
+This builds a universal `arm64` and `x86_64` helper, verifies its Studio Rownd Developer ID signature and waits for Apple notarization. It stages the plugin JSON packages and `catalog-v2.json`, opens draft GitHub releases and verifies the uploaded asset digests before publishing. Enable [immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases) on the repository. Release tags derive from the reviewed Git commit. For large catalogs the script publishes package shards first and makes the catalog release latest after their assets are available.
+
+The app reads its API's catalog and follows the fixed release tags for individual downloads. It checks the SHA-256 of each package and the signature of each native helper before activation. The legacy `catalog.json`, `catalog-latest.json` and `latest.json` package endpoints serve earlier Copaste builds. Keep existing API streams available when adding a breaking plugin API. Contributors can update a supported plugin without managing version numbers or rebuilding Copaste.
