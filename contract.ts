@@ -30,6 +30,7 @@ export type PluginPackage = (
 
 export type CatalogEntry = { assetRelease?: string; sha256: string } & PluginMetadata;
 
+export const maxNativePluginArtifactBytes = 1024 * 1024;
 export const pluginAssetReleaseTagPattern = /^plugins-[a-f0-9]{40}(?:-part-[1-9][0-9]?)?$/;
 export const pluginIdPattern = /^[a-z][a-z0-9-]{0,39}$/;
 export const pluginReleaseTagPattern = /^plugins-[a-f0-9]{40}$/;
@@ -200,5 +201,8 @@ export function parseReleaseCatalog(value: unknown): { entries: CatalogEntry[]; 
   const catalog = record(value);
   const release = text(catalog.release, 48);
   if (!pluginReleaseTagPattern.test(release)) throw new Error('Invalid plugin catalog release.');
-  return { entries: parseCatalogEntries(catalog, 2, release), release };
+  const entries = parseCatalogEntries(catalog, 2, release);
+  if ((catalog.plugins as unknown[]).length !== entries.length)
+    throw new Error('Incompatible entry in plugin release.');
+  return { entries, release };
 }

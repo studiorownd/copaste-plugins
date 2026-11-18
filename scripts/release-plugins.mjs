@@ -27,6 +27,29 @@ function releaseState(tag) {
   return JSON.parse(output);
 }
 
+function verifyTag(tag, commit, create = false) {
+  const reference = `refs/tags/${tag}`;
+  const refs = JSON.parse(github(['api', `repos/${repository}/git/matching-refs/tags/${tag}`]));
+  let tagRef = refs.find(entry => entry.ref === reference);
+  if (!tagRef && create) {
+    tagRef = JSON.parse(
+      github([
+        'api',
+        '--method',
+        'POST',
+        `repos/${repository}/git/refs`,
+        '-f',
+        `ref=${reference}`,
+        '-f',
+        `sha=${commit}`,
+      ])
+    );
+  }
+  if (tagRef?.object.type !== 'commit' || tagRef.object.sha !== commit) {
+    throw new Error(`Release tag ${tag} must point to the reviewed commit.`);
+  }
+}
+
 function verifyAssets(id, files) {
   const response = github(['api', '--paginate', '--slurp', `repos/${repository}/releases/${id}/assets?per_page=100`]);
   const uploaded = new Map(
@@ -43,6 +66,7 @@ function verifyAssets(id, files) {
 }
 
 function publish(tag, commit, files, isIndex, existingTags) {
+  verifyTag(tag, commit, !existingTags.has(tag));
   let release;
   if (existingTags.has(tag)) {
     release = releaseState(tag);
@@ -54,8 +78,7 @@ function publish(tag, commit, files, isIndex, existingTags) {
       '-R',
       repository,
       '--draft',
-      '--target',
-      commit,
+      '--verify-tag',
       '--title',
       isIndex ? 'Copaste Plugin Catalog' : 'Copaste Plugin Packages',
       '--notes',
@@ -68,6 +91,7 @@ function publish(tag, commit, files, isIndex, existingTags) {
       run('gh', ['release', 'upload', tag, '-R', repository, '--clobber', ...files.slice(index, index + 50)]);
     }
     verifyAssets(release.databaseId, files);
+    verifyTag(tag, commit);
     run('gh', ['release', 'edit', tag, '-R', repository, '--draft=false', isIndex ? '--latest' : '--latest=false']);
     release = releaseState(tag);
   } else {
@@ -95,6 +119,7 @@ if (tags.has(tag)) {
   const release = releaseState(tag);
   if (!release.isDraft) {
     if (!release.isImmutable) throw new Error('The existing plugin release is mutable.');
+    verifyTag(tag, commit);
     console.log(release.url);
     process.exit(0);
   }

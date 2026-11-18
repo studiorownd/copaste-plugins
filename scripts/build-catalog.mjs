@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { Script } from 'node:vm';
 
 import {
+  maxNativePluginArtifactBytes,
   parseCatalog,
   parsePluginPackage,
   parseReleaseCatalog,
@@ -14,7 +15,6 @@ import {
 
 const maxPackageBytes = 64 * 1024;
 const maxCatalogBytes = 1024 * 1024;
-const maxNativeBytes = 4 * 1024 * 1024;
 const maxPluginsPerRelease = 900;
 const nativeCapability = 'tcp-snapshot-v1';
 const root = resolve(import.meta.dirname, '..');
@@ -65,9 +65,11 @@ async function readArchive(directory, entry) {
 async function readNativeComponent(directory) {
   const artifact = join(directory, `native-${nativeCapability}.bin`);
   const info = await lstat(artifact);
-  if (!info.isFile() || info.size < 1 || info.size > maxNativeBytes) throw new Error('Invalid native component file.');
+  if (!info.isFile() || info.size < 1 || info.size > maxNativePluginArtifactBytes)
+    throw new Error('Invalid native component file.');
   const bytes = await readFile(artifact);
-  if (bytes.length < 1 || bytes.length > maxNativeBytes) throw new Error('Invalid native component size.');
+  if (bytes.length < 1 || bytes.length > maxNativePluginArtifactBytes)
+    throw new Error('Invalid native component size.');
   return { capability: nativeCapability, sha256: createHash('sha256').update(bytes).digest('hex') };
 }
 
