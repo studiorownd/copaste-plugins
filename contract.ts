@@ -22,8 +22,7 @@ export type PluginLink = { title: string; url: string };
 
 export type PluginPackage = (
   { kind: 'calculator' } | { kind: 'links'; links: PluginLink[] } | { kind: 'tcp-listeners' }
-) &
-  PluginMetadata;
+) & { script?: string } & PluginMetadata;
 
 export type CatalogEntry = { sha256: string } & PluginMetadata;
 
@@ -85,8 +84,7 @@ export function pluginMetadata(value: unknown): PluginMetadata {
     (version !== undefined && !versionPattern.test(version)) ||
     (kind !== 'calculator' && kind !== 'tcp-listeners' && kind !== 'links') ||
     (Object.hasOwn(object, 'bundled') && typeof bundled !== 'boolean') ||
-    (Object.hasOwn(object, 'defaultEnabled') && typeof defaultEnabled !== 'boolean') ||
-    (defaultEnabled === true && bundled !== true)
+    (Object.hasOwn(object, 'defaultEnabled') && typeof defaultEnabled !== 'boolean')
   ) {
     throw new Error('Unsupported plugin metadata.');
   }
@@ -109,11 +107,13 @@ export function parsePluginPackage(value: unknown): PluginPackage {
   const object = record(value);
   const metadata = pluginMetadata(object);
   const fields = ['apiVersion', ...Object.keys(metadata)];
+  const program = Object.hasOwn(object, 'script') ? { script: text(object.script, 64 * 1024) } : {};
+  if (program.script) fields.push('script');
   if (metadata.kind !== 'links') {
     if (Object.keys(object).some(key => !fields.includes(key))) throw new Error('Unknown plugin field.');
     return metadata.kind === 'calculator'
-      ? { ...metadata, kind: 'calculator' }
-      : { ...metadata, kind: 'tcp-listeners' };
+      ? { ...metadata, ...program, kind: 'calculator' }
+      : { ...metadata, ...program, kind: 'tcp-listeners' };
   }
   if (
     Object.keys(object).some(key => key !== 'links' && !fields.includes(key)) ||
@@ -131,7 +131,7 @@ export function parsePluginPackage(value: unknown): PluginPackage {
     }
     return { title: text(link.title, 80), url: url.href };
   });
-  return { ...metadata, kind: 'links', links };
+  return { ...metadata, ...program, kind: 'links', links };
 }
 
 export function parseCatalog(value: unknown): CatalogEntry[] {

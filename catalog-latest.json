@@ -7,7 +7,6 @@
         "example": "2+2",
         "mode": "inline"
       },
-      "bundled": true,
       "command": "calculate",
       "defaultEnabled": true,
       "description": "Calculate expressions directly in application search",
@@ -20,8 +19,8 @@
         },
         "symbol": "calculator"
       },
-      "sha256": "0d9f52b99a1c2181279a3c3b4d31bd8564c390cd6969b81804ccf80543f54127",
-      "title": "Calculator"
+      "title": "Calculator",
+      "sha256": "2b9b9a3aa8858aee633137d39ddc01368bb162d03af635b62d999e99dba8e167"
     },
     {
       "apiVersion": 1,
@@ -41,8 +40,8 @@
         "symbol": "plugs"
       },
       "placeholder": "Filter by port or process",
-      "sha256": "c320abb28a322ab54056e0ed90d4b41eb0203f8a58d8eb6f14f01296f45821df",
-      "title": "Port Manager"
+      "title": "Port Manager",
+      "sha256": "daf888b54469d79b5ee0f524567e0f27157f288f2d6fbfddfc57c8cc9b1ca459"
     }
   ]
 }

@@ -16,5 +16,6 @@
     "symbol": "plugs"
   },
   "placeholder": "Filter by port or process",
-  "defaultEnabled": false
+  "defaultEnabled": false,
+  "script": "globalThis.copastePlugin = {\n  query(query, listeners) {\n    const filter = query.trim().toLowerCase();\n    const numeric = /^\\d+$/.test(filter);\n    const matching = listeners.filter(listener => {\n      if (numeric) {\n        return String(listener.pid) === filter || listener.endpoints.some(endpoint => endpoint.endsWith(`:${filter}`));\n      }\n      return `${listener.name} ${listener.endpoints.join(' ')}`.toLowerCase().includes(filter);\n    });\n\n    return matching\n      .sort((a, b) => a.pid - b.pid)\n      .slice(0, 100)\n      .map(({ endpoints, id, name, pid }) => {\n        const sockets = endpoints.join(', ');\n        const label = sockets.length > 450 ? `${sockets.slice(0, 449)}…` : sockets;\n        return { description: `TCP ${label} · PID ${pid}`, id, title: name };\n      });\n  },\n};"
 }
