@@ -1,0 +1,9 @@
+{
+  "apiVersion": 1,
+  "id": "ports",
+  "version": "1.0.0",
+  "kind": "tcp-listeners",
+  "command": "ports",
+  "title": "Port Manager",
+  "description": "Inspect TCP listeners and terminate your development processes"
+}

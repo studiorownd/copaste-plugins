@@ -1,0 +1,25 @@
+{
+  "apiVersion": 1,
+  "plugins": [
+    {
+      "apiVersion": 1,
+      "command": "calculate",
+      "description": "Calculate expressions directly in application search",
+      "id": "calculator",
+      "kind": "calculator",
+      "sha256": "a68b435b9fae41b0ca9c7fcd944068a5954309122c44bbc80fdad413324e2425",
+      "title": "Calculator",
+      "version": "1.0.0"
+    },
+    {
+      "apiVersion": 1,
+      "command": "ports",
+      "description": "Inspect TCP listeners and terminate your development processes",
+      "id": "ports",
+      "kind": "tcp-listeners",
+      "sha256": "86896216ff2b1ae5f1fd41e44efbcfc45a2d44417d1df4c39bafd5e22b42b917",
+      "title": "Port Manager",
+      "version": "1.0.0"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "apiVersion": 1,
+  "id": "calculator",
+  "version": "1.0.0",
+  "kind": "calculator",
+  "command": "calculate",
+  "title": "Calculator",
+  "description": "Calculate expressions directly in application search"
+}
